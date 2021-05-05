@@ -8,6 +8,11 @@
 class MemeField
 {
 private: //private utility class
+	enum class Fate {
+		GonnaLive,
+		GonnaDie,
+		YetUncertain
+	};
 	class Tile {
 	public: //public utility enum
 		enum class State {
@@ -21,7 +26,8 @@ private: //private utility class
 		bool IsHidden() const;
 		bool IsFlagged() const;
 		bool HasMeme() const;
-		void Draw( Vei2 screenPos, bool isDed, Graphics& gfx ) const;
+		bool HasNoNeighbors() const;
+		void Draw( Vei2 screenPos, Fate fate, Graphics& gfx ) const;
 
 		void reveal();
 		void toggleFlag();
@@ -59,8 +65,7 @@ private: //private variables
 	RectI board;
 	Tile tiles[width * height];
 
-	bool isDed = false;
-	bool isGonnaLive = false;
+	Fate playerFate = Fate::YetUncertain;
 
 	int correctMemesFlagged = 0;
 	int totalMemes;

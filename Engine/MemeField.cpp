@@ -25,7 +25,12 @@ bool MemeField::Tile::HasMeme() const
 	return hasMeme;
 }
 
-void MemeField::Tile::Draw(Vei2 screenPos, bool isDed, Graphics& gfx) const
+bool MemeField::Tile::HasNoNeighbors() const
+{
+	return numAdjacentMemes == 0;
+}
+
+void MemeField::Tile::Draw(Vei2 screenPos, Fate fate, Graphics& gfx) const
 {
 	assert( screenPos.x >= 0 && screenPos.x < Graphics::ScreenWidth && 
 		screenPos.y >= 0 && screenPos.y < Graphics::ScreenHeight );
@@ -35,7 +40,7 @@ void MemeField::Tile::Draw(Vei2 screenPos, bool isDed, Graphics& gfx) const
 	switch ( state ) {
 	case State::Hidden:
 		
-		if ( isDed && HasMeme() ) {
+		if ( fate == Fate::GonnaDie && HasMeme() ) {
 			SpriteCodex::DrawTileBomb( screenPos, gfx );
 		}
 		else {
@@ -43,10 +48,10 @@ void MemeField::Tile::Draw(Vei2 screenPos, bool isDed, Graphics& gfx) const
 		}
 		break;
 	case State::Flagged:
-		if ( isDed && !HasMeme() ) {
+		if ( fate == Fate::GonnaDie && !HasMeme() ) {
 			SpriteCodex::DrawTileCross( screenPos, gfx );
 		}
-		else if ( isDed && HasMeme() ) {
+		else if ( fate == Fate::GonnaDie && HasMeme() ) {
 			SpriteCodex::DrawTileBomb( screenPos, gfx );
 		}
 		SpriteCodex::DrawTileFlag( screenPos, gfx );
@@ -129,7 +134,7 @@ RectI MemeField::getRect() const
 
 void MemeField::OnRevealClick( Vei2 screenPos )
 {
-	if ( isDed ) {
+	if ( playerFate != Fate::YetUncertain ) {
 		return;
 	}
 	assert(IsOnField(screenPos));
@@ -139,14 +144,30 @@ void MemeField::OnRevealClick( Vei2 screenPos )
 	if ( tiles[index].IsHidden() ) {
 		tiles[index].reveal();
 		if ( tiles[index].HasMeme() ) {
-			isDed = true;
+			playerFate = Fate::GonnaDie;
+		}
+		else if ( tiles[index].HasNoNeighbors() ) {
+			const int xStart = std::max<int>(0, gridPos.x - 1);
+			const int yStart = std::max<int>(0, gridPos.y - 1);
+			const int xEnd = std::min<int>(width - 1, gridPos.x + 1);
+			const int yEnd = std::min<int>(height - 1, gridPos.y + 1);
+
+			Vei2 pos;
+			int count = 0;
+			for (pos.y = yStart; pos.y <= yEnd; pos.y++) {
+				for (pos.x = xStart; pos.x <= xEnd; pos.x++) {
+					if ( !tiles[GridToIndex(pos)].IsRevealed() ) {
+						tiles[GridToIndex(pos)].reveal();
+					}
+				}
+			}
 		}
 	}
 }
 
 void MemeField::OnFlagClick( Vei2 screenPos )
 {
-	if ( isDed ) {
+	if ( playerFate != Fate::YetUncertain ) {
 		return;
 	}
 	assert( IsOnField( screenPos ) );
@@ -159,7 +180,7 @@ void MemeField::OnFlagClick( Vei2 screenPos )
 			correctMemesFlagged++;
 
 			if ( correctMemesFlagged == totalMemes ) {
-				isGonnaLive = true;
+				playerFate = Fate::GonnaLive;
 			}
 
 		}
@@ -174,18 +195,21 @@ bool MemeField::IsOnField(Vei2 screenPos) const
 
 void MemeField::Draw(Graphics& gfx) const
 {
-	if ( !isGonnaLive ) {
-		gfx.DrawRect(getRect().GetExpanded(5), Colors::Red);
+	if ( playerFate == Fate::YetUncertain ) {
+		gfx.DrawRect( getRect().GetExpanded(5), Colors::Yellow );
 	}
-	else{
-		gfx.DrawRect(getRect().GetExpanded(5), Colors::Green);
+	else if ( playerFate == Fate::GonnaLive ) {
+		gfx.DrawRect( getRect().GetExpanded(5), Colors::Green );
+	}
+	else {
+		gfx.DrawRect( getRect().GetExpanded(5), Colors::Red );
 	}
 	gfx.DrawRect( getRect(), SpriteCodex::baseColor );
 	
 	Vei2 pos;
 	for ( pos.y = 0; pos.y < height; pos.y++ ) {
 		for ( pos.x = 0; pos.x < width; pos.x++ ) {
-			tiles[ GridToIndex( pos ) ].Draw( GridToScreen( pos ), isDed, gfx );
+			tiles[ GridToIndex( pos ) ].Draw( GridToScreen( pos ), playerFate, gfx );
 		}
 	}
 }
