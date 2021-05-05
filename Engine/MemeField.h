@@ -34,6 +34,7 @@ private: //private utility class
 		void spawnMeme();
 
 		void setNumAdjacentMemes( int num );
+
 	private:
 		State state = State::Hidden;
 		bool hasMeme = false;
@@ -44,15 +45,18 @@ public: //public functions
 	MemeField( Vei2 center, int nMemes );
 	RectI getRect() const;
 
-	void OnRevealClick( Vei2 screenPos );
-	void OnFlagClick( Vei2 screenPos );
+	void OnRevealClick( const Vei2& screenPos );
+	void OnFlagClick( const Vei2& screenPos );
 
-	bool IsOnField( Vei2 screenPos ) const;
+	bool IsOnField( const Vei2& screenPos ) const;
 
 	void Draw( Graphics& gfx ) const;
 
 private: //utility functions
-	int countAdjacentMemes( Vei2 gridPos ) const;
+	int countAdjacentMemes( const Vei2& gridPos ) const;
+
+	void RevealTiles( const Vei2& gridPos );
+	bool GameIsWon() const;
 
 	Vei2 GridToScreen(const Vei2& gridPos) const;
 	Vei2 ScreenToGrid(const Vei2& screenPos) const;
@@ -66,8 +70,5 @@ private: //private variables
 	Tile tiles[width * height];
 
 	Fate playerFate = Fate::YetUncertain;
-
-	int correctMemesFlagged = 0;
-	int totalMemes;
 };
 

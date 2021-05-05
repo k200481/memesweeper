@@ -98,8 +98,7 @@ void MemeField::Tile::setNumAdjacentMemes(int num)
 
 MemeField::MemeField( Vei2 center, int nMemes )
 	:
-	board( RectI::FromCenter( center, (width * SpriteCodex::tileSize)/2, (height * SpriteCodex::tileSize)/2 ) ),
-	totalMemes( nMemes )
+	board( RectI::FromCenter( center, (width * SpriteCodex::tileSize)/2, (height * SpriteCodex::tileSize)/2 ) )
 {
 	assert(nMemes < ( width * height ));
 
@@ -132,7 +131,7 @@ RectI MemeField::getRect() const
 	return board;
 }
 
-void MemeField::OnRevealClick( Vei2 screenPos )
+void MemeField::OnRevealClick( const Vei2& screenPos )
 {
 	if ( playerFate != Fate::YetUncertain ) {
 		return;
@@ -140,32 +139,13 @@ void MemeField::OnRevealClick( Vei2 screenPos )
 	assert(IsOnField(screenPos));
 
 	const Vei2 gridPos = ScreenToGrid( screenPos );
-	const int index = GridToIndex( gridPos );
-	if ( tiles[index].IsHidden() ) {
-		tiles[index].reveal();
-		if ( tiles[index].HasMeme() ) {
-			playerFate = Fate::GonnaDie;
-		}
-		else if ( tiles[index].HasNoNeighbors() ) {
-			const int xStart = std::max<int>(0, gridPos.x - 1);
-			const int yStart = std::max<int>(0, gridPos.y - 1);
-			const int xEnd = std::min<int>(width - 1, gridPos.x + 1);
-			const int yEnd = std::min<int>(height - 1, gridPos.y + 1);
-
-			Vei2 pos;
-			int count = 0;
-			for (pos.y = yStart; pos.y <= yEnd; pos.y++) {
-				for (pos.x = xStart; pos.x <= xEnd; pos.x++) {
-					if ( !tiles[GridToIndex(pos)].IsRevealed() ) {
-						tiles[GridToIndex(pos)].reveal();
-					}
-				}
-			}
-		}
+	RevealTiles( gridPos );
+	if ( GameIsWon() ) {
+		playerFate = Fate::GonnaLive;
 	}
 }
 
-void MemeField::OnFlagClick( Vei2 screenPos )
+void MemeField::OnFlagClick( const Vei2& screenPos )
 {
 	if ( playerFate != Fate::YetUncertain ) {
 		return;
@@ -177,17 +157,16 @@ void MemeField::OnFlagClick( Vei2 screenPos )
 	if ( !tiles[index].IsRevealed() ) {
 		tiles[index].toggleFlag();
 		if ( tiles[index].HasMeme() ) {
-			correctMemesFlagged++;
 
-			if ( correctMemesFlagged == totalMemes ) {
+			if ( GameIsWon() ) {
 				playerFate = Fate::GonnaLive;
 			}
-
+			
 		}
 	}
 }
 
-bool MemeField::IsOnField(Vei2 screenPos) const
+bool MemeField::IsOnField( const Vei2& screenPos ) const
 {
 	return screenPos.x > board.left && screenPos.x < board.right
 		&& screenPos.y > board.top && screenPos.y < board.bottom;
@@ -214,7 +193,7 @@ void MemeField::Draw(Graphics& gfx) const
 	}
 }
 
-int MemeField::countAdjacentMemes(Vei2 gridPos) const
+int MemeField::countAdjacentMemes( const Vei2& gridPos ) const
 {
 	const int xStart = std::max<int>( 0, gridPos.x - 1 );
 	const int yStart = std::max<int>( 0, gridPos.y - 1 );
@@ -233,7 +212,59 @@ int MemeField::countAdjacentMemes(Vei2 gridPos) const
 	return count;
 }
 
-Vei2 MemeField::GridToScreen(const Vei2& gridPos) const
+void MemeField::RevealTiles(const Vei2& gridPos)
+{
+	Tile& t = tiles[GridToIndex(gridPos)];
+
+	if ( t.IsHidden() ) {
+		t.reveal();
+
+		if (t.HasMeme()) {
+			playerFate = Fate::GonnaDie;
+		}
+		else if (t.HasNoNeighbors()) {
+			const int xStart = std::max<int>(0, gridPos.x - 1);
+			const int yStart = std::max<int>(0, gridPos.y - 1);
+			const int xEnd = std::min<int>(width - 1, gridPos.x + 1);
+			const int yEnd = std::min<int>(height - 1, gridPos.y + 1);
+
+			Vei2 pos;
+			int count = 0;
+			for (pos.y = yStart; pos.y <= yEnd; pos.y++) {
+				for (pos.x = xStart; pos.x <= xEnd; pos.x++) {
+					Tile& t = tiles[GridToIndex(pos)];
+					if ( t.IsHidden() ) {
+						if (t.HasNoNeighbors()) {
+							RevealTiles(pos);
+						}
+						else {
+							t.reveal();
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+bool MemeField::GameIsWon() const
+{
+	const int nTiles = width * height;
+	for (int i = 0; i < nTiles; i++) {
+		if (tiles[i].HasMeme() && !tiles[i].IsFlagged()) {
+			return false;
+		}
+		else if (!tiles[i].HasMeme() && tiles[i].IsFlagged()) {
+			return false;
+		}
+		else if (!tiles[i].HasMeme() && !tiles[i].IsRevealed()) {
+			return false;
+		}
+	}
+	return true;
+}
+
+Vei2 MemeField::GridToScreen( const Vei2& gridPos ) const
 {
 	return gridPos * SpriteCodex::tileSize + Vei2( board.left, board.top );
 }
